@@ -251,6 +251,3 @@ Some possible extensions for this project include:
 BS in Data Science and Applications  
 Indian Institute of Technology Madras
 
-GitHub: *Add your GitHub profile link here*
-
-LinkedIn: *Add your LinkedIn profile link here*
