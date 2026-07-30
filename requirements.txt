@@ -1,0 +1,6 @@
+streamlit==1.48.1
+torch
+transformers==4.55.4
+safetensors
+sentencepiece
+numpy
