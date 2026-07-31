@@ -3,110 +3,145 @@ import torch
 import numpy as np
 from transformers import AutoTokenizer, AutoModelForMultipleChoice
 
+# Hugging Face Model Name
 MODEL_NAME = "sagnik538/distilbert-mcq-solver"
 
+# Streamlit Page Settings
 st.set_page_config(
     page_title="AI MCQ Solver",
-    page_icon="🧠",
     layout="centered"
 )
 
-LABELS = ["A", "B", "C", "D", "E"]
+# Labels for the options
+labels = ["A", "B", "C", "D", "E"]
 
 
+# Load model and tokenizer only once
 @st.cache_resource
 def load_model():
+
     tokenizer = AutoTokenizer.from_pretrained(MODEL_NAME)
 
-    model = AutoModelForMultipleChoice.from_pretrained(
-        MODEL_NAME
-    )
+    model = AutoModelForMultipleChoice.from_pretrained(MODEL_NAME)
 
     model.eval()
 
     return tokenizer, model
 
 
+# Load the model
 tokenizer, model = load_model()
 
 
-def predict(prompt, choices):
+# Function to predict the correct answer
+def predict_answer(question, options):
 
-    encoded = tokenizer(
-        [prompt] * 5,
-        choices,
-        truncation=True,
+    # Tokenize the question and all options
+    inputs = tokenizer(
+        [question] * 5,
+        options,
         padding="max_length",
+        truncation=True,
         max_length=128,
         return_tensors="pt"
     )
 
+    # Disable gradient calculation
     with torch.no_grad():
 
         outputs = model(
-            input_ids=encoded["input_ids"].unsqueeze(0),
-            attention_mask=encoded["attention_mask"].unsqueeze(0)
+            input_ids=inputs["input_ids"].unsqueeze(0),
+            attention_mask=inputs["attention_mask"].unsqueeze(0)
         )
 
-    probs = torch.softmax(outputs.logits, dim=1).cpu().numpy()[0]
+    # Convert logits into probabilities
+    probabilities = torch.softmax(outputs.logits, dim=1)
 
-    best = np.argmax(probs)
+    probabilities = probabilities.cpu().numpy()[0]
 
-    return best, probs
+    predicted_index = np.argmax(probabilities)
+
+    return predicted_index, probabilities
 
 
-st.title("🧠 AI MCQ Solver")
+# Streamlit UI part 
 
-st.markdown(
-    """
-Predict the best answer for any Multiple Choice Question using a fine-tuned DistilBERT model.
-"""
+
+st.title("AI MCQ Solver")
+
+st.write(
+    "Enter a question and five options. The model will predict the best answer."
 )
 
-prompt = st.text_area(
+# Question
+question = st.text_area(
     "Question",
     height=180
 )
 
-A = st.text_input("Option A")
-B = st.text_input("Option B")
-C = st.text_input("Option C")
-D = st.text_input("Option D")
-E = st.text_input("Option E")
+# Options
+option_a = st.text_input("Option A")
+option_b = st.text_input("Option B")
+option_c = st.text_input("Option C")
+option_d = st.text_input("Option D")
+option_e = st.text_input("Option E")
 
-if st.button("Predict Answer"):
 
-    if "" in [prompt, A, B, C, D, E]:
+# Predict Button
+if st.button("Predict"):
 
-        st.warning("Please fill all fields.")
+    # Check if all fields are filled
+    if "" in [
+        question,
+        option_a,
+        option_b,
+        option_c,
+        option_d,
+        option_e
+    ]:
+
+        st.warning("Please enter the question and all five options.")
 
     else:
 
-        prediction, probs = predict(
-            prompt,
-            [A, B, C, D, E]
+        options = [
+            option_a,
+            option_b,
+            option_c,
+            option_d,
+            option_e
+        ]
+
+        prediction, probabilities = predict_answer(
+            question,
+            options
         )
 
         st.success(
-            f"Predicted Answer : **{LABELS[prediction]}**"
+            f"Predicted Answer: Option {labels[prediction]}"
         )
+
+        st.write("---")
 
         st.subheader("Confidence Scores")
 
+        # Display confidence score for each option
         for i in range(5):
 
             st.write(
-                f"Option {LABELS[i]} : {probs[i]*100:.2f}%"
+                f"Option {labels[i]} : {probabilities[i] * 100:.2f}%"
             )
 
-            st.progress(float(probs[i]))
+            st.progress(float(probabilities[i]))
+
+        st.write("---")
 
         st.subheader("Top 3 Predictions")
 
-        top3 = np.argsort(probs)[::-1][:3]
+        top_three = np.argsort(probabilities)[::-1][:3]
 
-        for rank, idx in enumerate(top3, start=1):
+        for rank, index in enumerate(top_three, start=1):
 
             st.write(
-                f"{rank}. {LABELS[idx]} ({probs[idx]*100:.2f}%)"
+                f"{rank}. Option {labels[index]} ({probabilities[index] * 100:.2f}%)"
             )
